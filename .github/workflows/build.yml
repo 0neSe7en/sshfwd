@@ -1,0 +1,45 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        run: |
+          git ls-files '*.go' -z | xargs -0 gofmt -l > /tmp/unformatted-go-files
+          test ! -s /tmp/unformatted-go-files
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: |
+          mkdir -p dist
+          go build -trimpath -o dist/sshfwd .
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: sshfwd-linux-amd64
+          path: dist/sshfwd
+          if-no-files-found: error
