@@ -38,9 +38,9 @@ func (r consulResolver) Resolve(ctx context.Context, host, service string) (Endp
 	if err != nil {
 		message := strings.TrimSpace(stderr.String())
 		if message != "" {
-			return Endpoint{}, fmt.Errorf("query Consul through %s: %w: %s", host, err, message)
+			return Endpoint{}, fmt.Errorf("resolve service %q through %s: %w: %s", service, host, err, message)
 		}
-		return Endpoint{}, fmt.Errorf("query Consul through %s: %w", host, err)
+		return Endpoint{}, fmt.Errorf("resolve service %q through %s: %w", service, host, err)
 	}
 
 	endpoint, err := parseConsulResponse(output)

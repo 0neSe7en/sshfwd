@@ -96,7 +96,7 @@ func localPort(value string) (int, error) {
 	return port, nil
 }
 
-func checkConflicts(forwards []ForwardConfig, configured map[int]string) error {
+func checkConflicts(forwards []ResolvedForward, configured map[int]string) error {
 	seen := make(map[int]string)
 	for _, forward := range forwards {
 		if kind, ok := configured[forward.Local.Port]; ok {

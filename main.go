@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"sync"
 
 	"github.com/0neSe7en/sshfwd/internal/resolver"
@@ -17,6 +18,7 @@ type command int
 const (
 	commandTunnel command = iota
 	commandExport
+	commandHostsList
 )
 
 func main() {
@@ -50,6 +52,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("load %s: %w", path, err)
 	}
+	if cmd == commandHostsList {
+		printHosts(stdout, config.Hosts)
+		return nil
+	}
+
 	hostConfig, ok := config.Hosts[host]
 	if !ok {
 		return fmt.Errorf("host %q is not configured", host)
@@ -63,12 +70,12 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := checkConflicts(hostConfig.Forwards, listeners); err != nil {
-		return err
-	}
 
-	forwards, err := resolveForwards(ctx, serviceResolver, host, hostConfig.Forwards)
-	if err != nil {
+	forwards, resolveErrors := resolveForwards(ctx, serviceResolver, host, hostConfig.Forwards)
+	for _, err := range resolveErrors {
+		fmt.Fprintln(stderr, "sshfwd:", err)
+	}
+	if err := checkConflicts(forwards, listeners); err != nil {
 		return err
 	}
 
@@ -91,11 +98,14 @@ func parseArgs(args []string) (command, string, bool, error) {
 	if len(args) == 2 && args[0] == "export" {
 		return commandExport, args[1], false, nil
 	}
-	return commandTunnel, "", false, fmt.Errorf("usage: sshfwd <host> | sshfwd export <host>")
+	if len(args) == 2 && args[0] == "hosts" && args[1] == "ls" {
+		return commandHostsList, "", false, nil
+	}
+	return commandTunnel, "", false, fmt.Errorf("usage: sshfwd <host> | sshfwd export <host> | sshfwd hosts ls")
 }
 
-func resolveForwards(ctx context.Context, serviceResolver resolver.Resolver, host string, configs []ForwardConfig) ([]ResolvedForward, error) {
-	forwards := make([]ResolvedForward, len(configs))
+func resolveForwards(ctx context.Context, serviceResolver resolver.Resolver, host string, configs []ForwardConfig) ([]ResolvedForward, []error) {
+	results := make([]ResolvedForward, len(configs))
 	errs := make([]error, len(configs))
 
 	var wait sync.WaitGroup
@@ -108,7 +118,7 @@ func resolveForwards(ctx context.Context, serviceResolver resolver.Resolver, hos
 				errs[i] = err
 				return
 			}
-			forwards[i] = ResolvedForward{
+			results[i] = ResolvedForward{
 				ForwardConfig: config,
 				Endpoint:      endpoint,
 			}
@@ -116,12 +126,27 @@ func resolveForwards(ctx context.Context, serviceResolver resolver.Resolver, hos
 	}
 
 	wait.Wait()
-	for _, err := range errs {
+	forwards := make([]ResolvedForward, 0, len(configs))
+	resolveErrors := make([]error, 0)
+	for i, err := range errs {
 		if err != nil {
-			return nil, err
+			resolveErrors = append(resolveErrors, err)
+			continue
 		}
+		forwards = append(forwards, results[i])
 	}
-	return forwards, nil
+	return forwards, resolveErrors
+}
+
+func printHosts(writer io.Writer, hosts map[string]HostConfig) {
+	names := make([]string, 0, len(hosts))
+	for name := range hosts {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		fmt.Fprintln(writer, name)
+	}
 }
 
 func printResolved(writer io.Writer, forwards []ResolvedForward) {
@@ -145,5 +170,6 @@ func printExport(writer io.Writer, host string, forwards []ResolvedForward) {
 func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, `Usage:
   sshfwd <host>
-  sshfwd export <host>`)
+  sshfwd export <host>
+  sshfwd hosts ls`)
 }

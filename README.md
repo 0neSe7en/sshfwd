@@ -24,6 +24,12 @@ Export the current resolved endpoints as SSH config:
 sshfwd export <host>
 ```
 
+List configured host aliases in alphabetical order:
+
+```console
+sshfwd hosts ls
+```
+
 ## Quick start
 
 Configure an SSH host in `~/.ssh/config`:
@@ -55,6 +61,8 @@ sshfwd staging
 ```
 
 `sshfwd` resolves the Consul service `web` and forwards `127.0.0.1:3000` to the resolved service endpoint.
+
+Services resolve independently. `sshfwd` writes resolution errors to stderr and opens the tunnel with the services that resolved. When every service fails to resolve, OpenSSH still starts with forwards from the normal SSH config.
 
 ## Configuration
 

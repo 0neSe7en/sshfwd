@@ -67,29 +67,29 @@ printf '%s\n' 'dynamicforward [127.0.0.1]:1080' 'localforward 3000 [service]:303
 func TestCheckConflicts(t *testing.T) {
 	tests := []struct {
 		name       string
-		forwards   []ForwardConfig
+		forwards   []ResolvedForward
 		configured map[int]string
 		wantErr    string
 	}{
 		{
 			name: "no conflict",
-			forwards: []ForwardConfig{
-				{Service: "api", Local: LocalAddress{Port: 8080}},
-				{Service: "db", Local: LocalAddress{Port: 5432}},
+			forwards: []ResolvedForward{
+				{ForwardConfig: ForwardConfig{Service: "api", Local: LocalAddress{Port: 8080}}},
+				{ForwardConfig: ForwardConfig{Service: "db", Local: LocalAddress{Port: 5432}}},
 			},
 			configured: map[int]string{1080: "dynamicforward"},
 		},
 		{
 			name:       "SSH conflict",
-			forwards:   []ForwardConfig{{Service: "api", Local: LocalAddress{Port: 8080}}},
+			forwards:   []ResolvedForward{{ForwardConfig: ForwardConfig{Service: "api", Local: LocalAddress{Port: 8080}}}},
 			configured: map[int]string{8080: "localforward"},
 			wantErr:    "conflicts with SSH localforward",
 		},
 		{
 			name: "generated conflict",
-			forwards: []ForwardConfig{
-				{Service: "api", Local: LocalAddress{Port: 8080}},
-				{Service: "admin", Local: LocalAddress{Port: 8080}},
+			forwards: []ResolvedForward{
+				{ForwardConfig: ForwardConfig{Service: "api", Local: LocalAddress{Port: 8080}}},
+				{ForwardConfig: ForwardConfig{Service: "admin", Local: LocalAddress{Port: 8080}}},
 			},
 			wantErr: "used by services",
 		},
